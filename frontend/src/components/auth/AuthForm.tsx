@@ -39,13 +39,14 @@ const AuthForm: React.FC<AuthFormProps> = ({ type }) => {
 
   const onSubmit: SubmitHandler<SignInValues | SignUpValues> = async (data) => {
     if (type === "signup") {
-      const { name, email, password } = data as SignUpValues;
+      const { name, nickname, email, password } = data as SignUpValues;
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             name,
+            nickname,
           },
           emailRedirectTo: `${import.meta.env.VITE_APP_ORIGIN}`,
         },
