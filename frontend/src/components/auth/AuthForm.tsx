@@ -1,14 +1,14 @@
-import React from "react";
+import React, { useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import type { SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import AuthInput from "./AuthInput";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import supabase from "@/lib/supabaseClient";
+import toast from "react-hot-toast";
 
-// Define form schema types
 const signInSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
@@ -29,6 +29,9 @@ interface AuthFormProps {
 }
 
 const AuthForm: React.FC<AuthFormProps> = ({ type }) => {
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
   const {
     register,
     handleSubmit,
@@ -38,37 +41,53 @@ const AuthForm: React.FC<AuthFormProps> = ({ type }) => {
   });
 
   const onSubmit: SubmitHandler<SignInValues | SignUpValues> = async (data) => {
+    setLoading(true);
     if (type === "signup") {
       const { name, nickname, email, password } = data as SignUpValues;
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: {
-            name,
-            nickname,
-          },
+          data: { name, nickname },
           emailRedirectTo: `${import.meta.env.VITE_APP_ORIGIN}`,
         },
       });
-      if (error) alert(error.message);
+      setLoading(false);
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success("Signup successful! Check your email to confirm.");
+        navigate("/sign-in"); // <-- redirect to sign-in after signup success
+      }
     } else {
       const { email, password } = data as SignInValues;
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
-      if (error) alert(error.message);
+      setLoading(false);
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success("Signed in successfully!");
+        navigate("/"); // <-- redirect home after sign-in success
+      }
     }
   };
 
   const handleGoogleAuth = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${import.meta.env.VITE_APP_ORIGIN}/`,
-      },
-    });
+    setLoading(true);
+    try {
+      await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${import.meta.env.VITE_APP_ORIGIN}/auth/callback`,
+        },
+      });
+    } catch (error: any) {
+      setLoading(false);
+      toast.error(error.message || "Google sign-in failed");
+    }
   };
 
   return (
@@ -112,17 +131,35 @@ const AuthForm: React.FC<AuthFormProps> = ({ type }) => {
           required
         />
 
-        <Button type="submit" className="w-full">
-          {type === "signin" ? "Sign In" : "Sign Up"}
+        <Button
+          type="submit"
+          disabled={loading}
+          isLoading={loading}
+          className="w-full"
+        >
+          {loading
+            ? type === "signin"
+              ? "Signing In..."
+              : "Signing Up..."
+            : type === "signin"
+            ? "Sign In"
+            : "Sign Up"}
         </Button>
 
         <button
           type="button"
           onClick={handleGoogleAuth}
           className="w-full flex items-center justify-center gap-2 border border-input rounded-md py-2 text-sm hover:bg-accent"
+          style={{ cursor: loading ? "wait" : "pointer" }}
+          disabled={loading}
         >
-          <img src="/google-icon.svg" alt="Google" width="20" height="20" />
-          Continue with Google
+          <img
+            src="/assets/google-logo.png"
+            alt="Google"
+            width="20"
+            height="20"
+          />
+          {loading ? "Processing..." : "Continue with Google"}
         </button>
       </form>
 
